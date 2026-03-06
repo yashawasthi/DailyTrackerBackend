@@ -21,14 +21,22 @@ app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(morgan('dev'));
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.use('/api', (req, res, next) => {
   if (req.path === '/health') return next();
+
   if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({ message: 'Database unavailable. Retrying connection.' });
+    return res
+      .status(503)
+      .json({ message: 'Database unavailable. Retrying connection.' });
   }
-  return next();
+
+  next();
 });
+
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', auth, taskRoutes);
 
@@ -37,17 +45,20 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ message: 'Something went wrong.' });
 });
 
-const startMongoWithRetry = async () => {
+const startServer = async () => {
   try {
     await connectDB();
+
+    app.listen(env.port, () => {
+      console.log(`Server running on port ${env.port}`);
+    });
+
   } catch (error) {
     console.error(`MongoDB connection failed: ${error.message}`);
     console.log('Retrying MongoDB connection in 10s...');
-    setTimeout(startMongoWithRetry, 10000);
+
+    setTimeout(startServer, 10000);
   }
 };
 
-app.listen(env.port, () => {
-  console.log(`Server running on http://localhost:${env.port}`);
-  startMongoWithRetry();
-});
+startServer();
